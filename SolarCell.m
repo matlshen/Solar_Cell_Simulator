@@ -16,6 +16,8 @@ classdef SolarCell < handle
         theta           % Elevation angle (0 when flat)
         phi             % Roll angle (0 when flat)
 
+        isSelected      % Cell is selected in GUI
+        parentModuleId  % ID of module cell belongs to
         fullyDefined    % All parameters are defined
         viMatrix        % VI Matrix for storing VI curve
 
@@ -77,6 +79,12 @@ classdef SolarCell < handle
             end
         end
 
+        % Returns maximum effective Iopt given angle and light intensity
+        function MaxIopt = GetMaxIopt(obj, li)
+            multiplier = cosd(obj.theta) * cosd(obj.phi) * li;
+            MaxIopt = multiplier * obj.IoptMax;
+        end
+
         % Returns open-circuit voltage based on light intensity
         function Voc = GetVoc(obj, li)
             if obj.fullyDefined
@@ -136,7 +144,7 @@ classdef SolarCell < handle
             plot(I, y);
             plot([0 0], ylim, 'k-')         % plot y-axis
             plot(xlim, [0 0], 'k-')         % plot x-axis
-            xlabel('Current (I)')
+            xlabel('Currnet (A)')
             ylabel('Voltage (V)')
             hold off
         end
@@ -152,7 +160,7 @@ classdef SolarCell < handle
             plot([0 0], ylim, 'k-')         % plot y-axis
             plot(xlim, [0 0], 'k-')         % plot x-axis
             xlabel('Voltage (V)')
-            ylabel('Current (I)')
+            ylabel('Currnet (A)')
             hold off
         end
 
@@ -173,7 +181,7 @@ classdef SolarCell < handle
             plot([0 0], ylim, 'k-')         % plot y-axis
             plot(xlim, [0 0], 'k-')         % plot x-axis
             xlabel('Voltage (V)')
-            ylabel('Current (I)')
+            ylabel('Currnet (A)')
 
             yyaxis right
             plot(V, P)                      % plot power as a function of voltage
@@ -210,7 +218,14 @@ classdef SolarCell < handle
                 obj.viMatrix = multiplier * log_term - series_r_drop;
 
                 obj.viMatrix = obj.viMatrix ./ (imag(log_term) == 0);   % Handle undefined logs
-    
+            else
+                error('Cell must be fully defined');
+            end
+        end
+
+        % Export viMatrix as csv file
+        function ExportMatrix(obj)
+            if obj.fullyDefined
                 filename = "CurveData/" + obj.id + ".csv";
                 writematrix(obj.viMatrix, filename);
             else
@@ -242,17 +257,19 @@ classdef SolarCell < handle
             obj.theta = [];
             obj.phi = [];
             obj.fullyDefined = 0;
+            obj.isSelected = 0;
+            obj.parentModuleId = "";
 
-            if nargin >= 4
+            if nargin >= 5
                 obj.eta = varargin{1};
-                obj.I_S = varargin{2};
+                obj.Is = varargin{2};
                 obj.R = varargin{3};
                 obj.IoptMax = varargin{4};
             end
-            if nargin >= 5
+            if nargin >= 6
                 obj.T = varargin{5};
             end
-            if nargin == 7
+            if nargin == 8
                 obj.theta = varargin{6};
                 obj.phi = varargin{7};
                 obj.fullyDefined = 1;

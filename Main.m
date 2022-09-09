@@ -18,11 +18,15 @@ testCell.IoptMax = IoptMax;
 testCell.T = T;
 testCell.theta = theta;
 testCell.phi = phi;
+testCell2 = SolarCell.CreateCell("testCell2", eta, Is, R, IoptMax, T, theta, phi);
 
-testModule = Module.CreateModule('testModule');
+testModule = Module.CreateModule("testModule");
 testModule.AddCell(testCell);
+testModule.AddCell(testCell2);
+testModule.bypassPresent = 1;
 
-
+testModule.PlotMPP(1);
+[V, I, P] = testModule.GetMPP(1)
 
 %% Test Plot single cell
 testCell.PlotMPP(0.5);
