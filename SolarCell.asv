@@ -16,10 +16,10 @@ classdef SolarCell < handle
         theta           % Elevation angle (0 when flat)
         phi             % Roll angle (0 when flat)
 
-        isSelected = 0      % Cell is selected in GUI
-        parentModuleId      % ID of module cell belongs to
-        fullyDefined = 0    % All parameters are defined
-        viMatrix            % VI Matrix for storing VI curve
+        isSelected      % Cell is selected in GUI
+        parentModuleId  % ID of module cell belongs to
+        fullyDefined    % All parameters are defined
+        viMatrix        % VI Matrix for storing VI curve
 
     end
 
@@ -140,8 +140,8 @@ classdef SolarCell < handle
         % sun relative to cell
         function effLi = ComputeEffLi(obj, li, sZenith, sAzimuth)
             % [NorthDistance EastDistance Altitude]
-            sunVector = [sind(sZenith)*cosd(sAzimuth) sind(sZenith)*sind(sAzimuth) cosd(sZenith)];
-            cellNormal = [-sind(obj.theta) sind(obj.phi) cosd(obj.theta)];
+            sunVector = [sind(cosd(sAzimuth) sind(sAzimuth) cosd(sZenith)];
+            cellNormal = [sind(obj.theta) sind(obj.phi) cosd(obj.theta)];
             cosIncidence = dot(sunVector, cellNormal);
             effLi = li * cosIncidence;
         end
