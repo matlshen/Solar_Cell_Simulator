@@ -6,10 +6,11 @@ classdef Module < handle
 
     properties
         id                      % Module identifier
+        color                   % Module view color
         cellList SolarCell      % Vector containing SolarCell objects
         numCells                % Number of objects in CellList
         shadeList               % Vector containing cell shade levels
-        bypassPresent           % 1 if there is a bypass diode present
+        bypassPresent = 1       % 1 if there is a bypass diode present
 
         viMatrix                % VI Matrix for storing VI curve
     end
@@ -166,13 +167,15 @@ classdef Module < handle
     methods (Static)
 
         % Constructor function
-        function obj = CreateModule(id, varargin)
+        function obj = CreateModule(id, color, varargin)
             obj = Module;
             obj.id = id;
-            obj.numCells = nargin - 1;
+            obj.color = color;
+            obj.numCells = nargin - 2;
             obj.shadeList = [];
             obj.bypassPresent = 0;
-            for i = 1:(nargin - 1)
+
+            for i = 1:(nargin - 2)
                 obj.cellList(i) = varargin{i};
             end
             obj.GenerateMatrix;
