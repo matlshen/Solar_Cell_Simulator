@@ -6,13 +6,14 @@ classdef Module < handle
 
     properties
         id                      % Module identifier
-        color                   % Module view color
-        cellList SolarCell      % Vector containing SolarCell objects
-        numCells                % Number of objects in CellList
-        shadeList               % Vector containing cell shade levels
-        bypassPresent = 1       % 1 if there is a bypass diode present
+        numCells = 0            % Number of objects in CellList
 
-        viMatrix                % VI Matrix for storing VI curve
+        cellList SolarCell      % Vector containing SolarCell objects
+        shadeList               % Vector containing cell shade levels
+        bypassPresent = 0       % 1 if there is a bypass diode present
+        parentArrayId uint32    % ID of subarray module belongs to
+
+        viVector                % VI Vector for storing VI curve
     end
 
     methods
@@ -21,36 +22,36 @@ classdef Module < handle
         function AddCell(obj, cell)
             obj.numCells = obj.numCells + 1;
             obj.cellList(obj.numCells) = cell;
-            obj.GenerateMatrix;
+            obj.GenerateVector;
         end
 
         % Remove cell from end of cellList
         function RemoveCell(obj, idx)
             obj.cellList(idx) = [];
             obj.numCells = obj.numCells - 1;
-            obj.GenerateMatrix;
+            obj.GenerateVector;
         end
 
-        % Setter function for bypass diode will re-generate matrix
+        % Setter function for bypass diode will re-generate vector
         function set.bypassPresent(obj, bypassPresent)
             obj.bypassPresent = bypassPresent;
-            obj.GenerateMatrix;
+            obj.GenerateVector;
         end
 
-        % Import VI matrix from file
-        function ImportMatrix(obj, filename)
-            obj.viMatrix = readmatrix("CurveData/" + filename);
+        % Import VI vector from file
+        function ImportVector(obj, filename)
+            obj.viVector = readvector("CurveData/" + filename);
         end
 
         % Returns cell current given voltage and light intensity
         function I = GetCurrent(obj, V, li)
-            [~, idx] = min(abs(obj.viMatrix(obj.liIndex(li), :) - V));
+            [~, idx] = min(abs(obj.viVector(obj.liIndex(li), :) - V));
             I = obj.IndexCurrent(idx);
         end
 
         % Returns cell voltage given current and light intensity
         function V = GetVoltage(obj, I, li)
-            V = obj.viMatrix(obj.liIndex(li), obj.CurrentIndex(I));
+            V = obj.viVector(obj.liIndex(li), obj.CurrentIndex(I));
         end
 
         % Returns open-circuit voltage based on light intensity
@@ -85,7 +86,7 @@ classdef Module < handle
         % Plot VI curve
         function PlotVI(obj, li)
             I = linspace(-1, 10, 1101);
-            y = obj.viMatrix(obj.liIndex(li), :);
+            y = obj.viVector(obj.liIndex(li), :);
 
             hold on
             title('VI Characteristics of ' + obj.id)
@@ -99,7 +100,7 @@ classdef Module < handle
 
         % Plot IV curve
         function PlotIV(obj, li)
-            V = obj.viMatrix(obj.liIndex(li), :);
+            V = obj.viVector(obj.liIndex(li), :);
             I = linspace(-1, 10, 1101);
 
             hold on
@@ -114,7 +115,7 @@ classdef Module < handle
 
         % Plot MPP curve with IV curve
         function PlotMPP(obj, li)
-            V = obj.viMatrix(obj.liIndex(li), :);
+            V = obj.viVector(obj.liIndex(li), :);
             I = linspace(-1, 10, 1101);
             P = obj.GetPowerI(I, li);
             [Vmpp, Impp, ~] = obj.GetMPP(li);
@@ -141,25 +142,25 @@ classdef Module < handle
 
     methods (Access = private)
 
-        % Generate VI matrix for module
-        function GenerateMatrix(obj)
+        % Generate VI vector for module
+        function GenerateVector(obj)
             if obj.numCells > 0
-                obj.viMatrix = zeros(size(obj.cellList(1).viMatrix));
+                obj.viVector = zeros(size(obj.cellList(1).viVector));
                 for i = 1:obj.numCells              % Sum the matricies of individual cells
                     if obj.cellList(i).fullyDefined == 1
-                        obj.viMatrix = obj.viMatrix + obj.cellList(i).viMatrix;
+                        obj.viVector = obj.viVector + obj.cellList(i).viVector;
                     else
                         error('Cells must be fully defined');
                     end
                 end
 
                 if obj.bypassPresent                % Add parallel ideal diode
-                    obj.viMatrix = obj.viMatrix .* (obj.viMatrix >= 0);
-                    obj.viMatrix = obj.viMatrix .* ~isinf(obj.viMatrix);
+                    obj.viVector = obj.viVector .* (obj.viVector >= 0);
+                    obj.viVector = obj.viVector .* ~isinf(obj.viVector);
                 end
 
-                filename = "CurveData/" + obj.id + ".csv";
-                writematrix(obj.viMatrix, filename);
+                % filename = "CurveData/" + obj.id + ".csv";
+                % writevector(obj.viVector, filename);
             end
         end
     end
@@ -167,31 +168,30 @@ classdef Module < handle
     methods (Static)
 
         % Constructor function
-        function obj = CreateModule(id, color, varargin)
+        function obj = CreateModule(id, varargin)
             obj = Module;
             obj.id = id;
-            obj.color = color;
-            obj.numCells = nargin - 2;
+            obj.numCells = nargin - 1;
             obj.shadeList = [];
             obj.bypassPresent = 0;
 
-            for i = 1:(nargin - 2)
+            for i = 1:(nargin - 1)
                 obj.cellList(i) = varargin{i};
             end
-            obj.GenerateMatrix;
+            obj.GenerateVector;
         end
 
-        % Convert absolute current into matrix index
+        % Convert absolute current into vector index
         function idx = CurrentIndex(I)
             idx = int32((I + 1) * 100 + 1);
         end
 
-        % Convert matrix index into absolute current
+        % Convert vector index into absolute current
         function I = IndexCurrent(idx)
             I = (idx - 1) / 100 - 1;
         end
     
-        % Convert absolute light intensity into matrix index
+        % Convert absolute light intensity into vector index
         function idx = liIndex(li)
             idx = int32(li * 100 + 1);
         end

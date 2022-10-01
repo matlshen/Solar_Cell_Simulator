@@ -1,0 +1,129 @@
+%% Cluster Class
+% Defines a generic container that holds SolarCell or Cluster objects
+% Objects stored in cluster are electrically in series
+
+classdef Cluster < handle
+
+    properties
+
+        id uint32           % Numerical ID of cluster
+        name                % String containing cluster name
+        color               % Color code in array view
+        
+        size = 0            % Number of stored objects
+        SolarObjects = {}   % Cells array containing SolarCell or Cluster
+
+        IoptMax = 0         % Sets limit on minimization functions
+
+        viVector
+        parentId = 0        % ID of parent container
+        bypassPresent = 0   % 1 if bypass diode in parallel with container
+        fullyDefined = 1    % Not important for this, mimics SolarCell
+
+    end
+
+    methods
+
+        function AddObject(obj, item)
+            if item.fullyDefined
+                obj.size = obj.size + 1;
+                obj.SolarObjects{obj.size} = item;
+                obj.SolarObjects{obj.size}.parentId = obj.id;
+                obj.IoptMax = max(obj.IoptMax, item.IoptMax);
+            end
+        end
+
+        function RemoveObject(obj, idx)
+            if idx <= obj.size
+                obj.SolarObjects{idx}.parentId = 0;
+                obj.SolarObjects(idx) = [];
+                obj.size = obj.size - 1;
+            end
+        end
+
+        function GenerateCurve(obj, li, zen, azm)
+            obj.viVector = zeros(1, 11001);
+
+            % Generate vector for each object
+            for i = 1:obj.size
+                obj.SolarObjects{i}.GenerateCurve(li, zen, azm);
+            end
+
+            % viVector is sum of vectors of stored objects
+            for i = 1:obj.size
+                obj.viVector = obj.viVector + obj.SolarObjects{i}.viVector;
+            end
+            
+            % Add parallel ideal diode
+            if obj.bypassPresent
+                obj.viVector = obj.viVector .* (obj.viVector >= 0);
+                obj.viVector = obj.viVector .* ~isinf(obj.viVector);
+            end
+        end
+
+        % Returns current given voltage
+        function I = GetCurrent(obj, V)
+            [~, idx] = min(abs(obj.viVector - V));
+            I = obj.IdxtoI(idx);
+        end
+
+        % Returns voltage given current
+        function V = GetVoltage(obj, I)
+            idx = obj.ItoIdx(I);
+            V = obj.viVector(idx);
+        end
+
+        % Returns open-circuit voltage
+        function Voc = GetVoc(obj)
+            Voc = obj.GetVoltage(0);
+        end
+
+        % Returns short-circuit current
+        function Isc = GetIsc(obj)
+            Isc = obj.GetCurrent(0);
+        end
+
+        % Returns power given voltage
+        function P = GetPowerV(obj, V)
+            P = V .* obj.GetCurrent(V);
+            P = P .* ~(isinf(P));
+        end
+
+        % Returns power given current
+        function P = GetPowerI(obj, I)
+            P = I .* obj.GetVoltage(I);
+            P = P .* ~(isinf(P));
+        end
+
+        % Returns electrical parameters at the maximum power point
+        function [Vmpp, Impp, Pmpp] = GetMPP(obj)
+            Impp = fminbnd(@(I)obj.GetPowerI(I) * (-1), 0, obj.IoptMax);
+            Vmpp = obj.GetVoltage(Impp);
+            Pmpp = Impp * Vmpp;
+        end
+
+    end
+
+    methods (Static)
+        
+        % Class constructor function
+        function obj = CreateCluster(id, name, color)
+            obj = Cluster;
+            obj.id = id;
+            obj.name = name;
+            obj.color = color;
+        end
+
+        % Convert current (A) to index
+        function idx = ItoIdx(I)
+            idx = floor((I + 1) * 1000 + 1);
+        end
+
+        % Convert index to current (A)
+        function I = IdxtoI(idx)
+            I = (idx - 1) / 1000 - 1;
+        end
+
+    end
+
+end
